@@ -1,12 +1,11 @@
-(function initShadersModule(globalScope) {
-  const VERT_SRC = `
+export const VERT_SRC = `
 attribute vec2 a_position;
 void main(void) {
   gl_Position = vec4(a_position, 0.0, 1.0);
 }
 `;
 
-  const FRAG_SRC = `
+export const FRAG_SRC = `
 precision highp float;
 uniform vec2 u_resolution;
 uniform float u_time;
@@ -19,21 +18,18 @@ uniform float u_sharpness;
 const float TAU = 6.283185307179586;
 
 float hash12(vec2 p) {
-  // псевдослучайное число из координат пикселя
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
 }
 
 mat2 rot2(float a) {
-  // матрица поворота, чтобы октавы fbm не накладывались в одном направлении
   float s = sin(a);
   float c = cos(a);
   return mat2(c, -s, s, c);
 }
 
 float valueNoise(vec2 p) {
-  // интерполированный шум по целочисленной сетке
   vec2 i = floor(p);
   vec2 f = fract(p);
   float a = hash12(i + vec2(0.0, 0.0));
@@ -47,7 +43,6 @@ float valueNoise(vec2 p) {
 }
 
 float fbm(vec2 p) {
-  // 3 октавы шума, этого хватает для живой пластики
   float v = 0.0;
   float a = 0.56;
   vec2 q = p;
@@ -62,7 +57,6 @@ float fbm(vec2 p) {
 }
 
 vec2 domainWarp(vec2 uv, float ph) {
-  // мягко ломаем идеальные круги чтобы формы были живее
   vec2 p = uv;
   vec2 o1 = vec2(cos(ph), sin(ph));
   vec2 o2 = vec2(cos(ph + 2.1), sin(ph + 2.1));
@@ -77,7 +71,6 @@ vec2 domainWarp(vec2 uv, float ph) {
 }
 
 void main(void) {
-  // uv в центрированной системе координат
   float aspect = u_resolution.x / u_resolution.y;
   vec2 uv01 = gl_FragCoord.xy / u_resolution.xy;
   vec2 uv = vec2((uv01.x - 0.5) * aspect, uv01.y - 0.5);
@@ -90,7 +83,6 @@ void main(void) {
   vec3 avgPal = vec3(0.0);
 
   for (int i = 0; i < 10; i++) {
-    // вес цвета зависит и от доли и от его концентрации на исходнике
     vec3 pc = u_palette[i];
     avgPal += pc * u_colorWeights[i];
     float fi = float(i);
@@ -107,7 +99,6 @@ void main(void) {
     c += vec2(amp2 * sin(ph + fi * 0.41), amp2 * cos(2.0 * ph + fi * 1.33));
     c = clamp(c, vec2(0.04), vec2(0.96));
     c = vec2((c.x - 0.5) * aspect, c.y - 0.5);
-    // чем ближе к центру цвета тем больше вклад
     float d = length(warped - c);
     float sharpK = mix(2.48, 4.45, clamp(u_sharpness, 0.0, 1.0));
     float focusK = mix(1.04, 1.85, focus);
@@ -120,12 +111,10 @@ void main(void) {
   }
 
   vec3 color = accum / max(totalW, 1e-5);
-  // немного общего haze чтобы не было слишком жестких стыков
   float haze = 0.046 * fbm(warped * 0.92 + vec2(cos(ph), sin(ph)));
   float hazeMix = mix(0.012, 0.055, 1.0 - clamp(u_sharpness, 0.0, 1.0));
   color = mix(color, avgPal, haze * (hazeMix - 0.02 * u_tune.z));
 
-  // чуть зерна чтобы сжатие видео не убивало градиенты
   float frame = floor(t * 60.0);
   float grain = hash12(floor(gl_FragCoord.xy) + vec2(frame * 1.37, frame * 2.11)) - 0.5;
   color += grain * ((1.0 * u_tune.w) / 255.0);
@@ -134,6 +123,3 @@ void main(void) {
   gl_FragColor = vec4(color, 1.0);
 }
 `;
-
-  globalScope.AppShaders = { VERT_SRC, FRAG_SRC };
-})(window);

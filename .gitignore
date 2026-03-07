@@ -12,3 +12,8 @@ Thumbs.db
 # temp
 *.tmp
 *.swp
+
+# node
+node_modules/
+dist/
+*.tsbuildinfo
